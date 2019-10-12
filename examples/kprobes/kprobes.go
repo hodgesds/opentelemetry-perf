@@ -3,10 +3,12 @@ package main
 import (
 	"context"
 	"log"
-	"math/bits"
+	"syscall"
 	"time"
 
 	otperf "github.com/hodgesds/opentelemetry-perf"
+	perf "github.com/hodgesds/perf-utils"
+	"go.opentelemetry.io/api/core"
 	"go.opentelemetry.io/exporter/trace/stdout"
 	"go.opentelemetry.io/sdk/trace"
 	sdktrace "go.opentelemetry.io/sdk/trace"
@@ -32,7 +34,18 @@ func main() {
 
 	ctx := context.Background()
 
-	builder, err := otperf.NewHardwareProfilerBuilder()
+	eventAttr, err := perf.TracepointEventAttr("syscalls", "sys_enter_getcwd")
+	if err != nil {
+		log.Fatal(err)
+	}
+	builder, err := otperf.NewPerfProfilerBuilder(
+		[]otperf.EventAttrConfig{
+			{
+				EventAttr: *eventAttr,
+				SpanKey:   "sys_enter_getcwd",
+			}},
+		false,
+	)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -43,14 +56,14 @@ func main() {
 	)
 	m.Start()
 
-	// Pool a function that calculates the number of leading zero bits from
-	// 1-100.
-	p := m.Pool(func(ctx context.Context) {
-		for i := 1; i <= 100; i++ {
-			bits.LeadingZeros(uint(i))
-		}
+	p := m.Pool(func(ctx context.Context) error {
+		syscall.Getcwd([]byte{})
+		syscall.Getcwd([]byte{})
+		syscall.Getcwd([]byte{})
+		_, err := syscall.Getcwd(make([]byte, 100))
+		return err
 	})
 
 	p(ctx)
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(200 * time.Millisecond)
 }

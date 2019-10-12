@@ -7,7 +7,7 @@ import (
 )
 
 // Poolable is a function that can be pooled across goroutines.
-type Poolable func(context.Context)
+type Poolable func(context.Context) error
 
 // PoolManager is used to manage a pool of Poolable function.
 type PoolManager interface {
@@ -18,7 +18,7 @@ type PoolManager interface {
 
 // Profiler is used to profile a Poolable function
 type Profiler interface {
-	Profile(context.Context, apitrace.Span, Poolable)
+	Profile(context.Context, apitrace.Span, Poolable) error
 }
 
 // ProfilerBuilder is a builder for producing Profilers.

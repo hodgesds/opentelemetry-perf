@@ -10,7 +10,7 @@ import (
 )
 
 func TestPoolManager(t *testing.T) {
-	poolable := func(ctx context.Context) {}
+	poolable := func(ctx context.Context) error { return nil }
 	m := NewPoolManager(WithTracer(trace.Register()))
 	require.Nil(t, m.Start())
 	p := m.Pool(poolable)
@@ -19,7 +19,7 @@ func TestPoolManager(t *testing.T) {
 }
 
 func BenchmarkPoolManager(b *testing.B) {
-	poolable := func(ctx context.Context) {}
+	poolable := func(ctx context.Context) error { return nil }
 	m := NewPoolManager(WithTracer(trace.Register()))
 	m.Start()
 	p := m.Pool(poolable)
@@ -32,7 +32,7 @@ func BenchmarkPoolManager(b *testing.B) {
 }
 
 func BenchmarkPoolable(b *testing.B) {
-	poolable := func(ctx context.Context) {}
+	poolable := func(ctx context.Context) error { return nil }
 	ctx := context.Background()
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -41,14 +41,15 @@ func BenchmarkPoolable(b *testing.B) {
 	}
 }
 
-func TestPerfProfiler(t *testing.T) {
-	poolable := func(ctx context.Context) {
+func TestHardwareProfiler(t *testing.T) {
+	poolable := func(ctx context.Context) error {
 		syscall.Getcwd([]byte{})
 		syscall.Getcwd([]byte{})
 		syscall.Getcwd([]byte{})
 		syscall.Getcwd([]byte{})
+		return nil
 	}
-	builder, err := NewHardwareProfilerBuilder()
+	builder, err := NewHardwareProfilerBuilder(false)
 	require.Nil(t, err)
 	m := NewPoolManager(WithProfilerBuilder(builder), WithTracer(trace.Register()))
 	require.Nil(t, m.Start())
@@ -57,10 +58,11 @@ func TestPerfProfiler(t *testing.T) {
 	require.Nil(t, m.Stop())
 }
 
-func BenchmarkPoolManagerPerf(b *testing.B) {
-	poolable := func(ctx context.Context) {
+func BenchmarkPoolManagerHardwareProfiler(b *testing.B) {
+	poolable := func(ctx context.Context) error {
+		return nil
 	}
-	builder, err := NewHardwareProfilerBuilder()
+	builder, err := NewHardwareProfilerBuilder(false)
 	if err != nil {
 		b.Fatal(err)
 	}

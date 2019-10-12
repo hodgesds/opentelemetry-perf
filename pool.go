@@ -10,6 +10,13 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+// errPool is for pooling error channels to reduce allocations.
+var errPool = sync.Pool{
+	New: func() interface{} {
+		return make(chan error)
+	},
+}
+
 type managerOpt func(*manager)
 
 // WithTracer sets the tracer on a PoolManager.
@@ -30,14 +37,6 @@ func WithProfilerBuilder(builder ProfilerBuilder) managerOpt {
 	}
 }
 
-// WithAsynchronous sets the PoolManager to execute functions asynchronously
-// (non-blocking).
-func WithAsynchronous() managerOpt {
-	return func(m *manager) {
-		m.async = true
-	}
-}
-
 // NewPoolManager returns a PoolManager.
 func NewPoolManager(opts ...managerOpt) PoolManager {
 	ncpus := runtime.NumCPU()
@@ -52,9 +51,8 @@ func NewPoolManager(opts ...managerOpt) PoolManager {
 	}
 
 	m := &manager{
-		workers:   workers,
-		asyncWork: make(chan func() (context.Context, Poolable)),
-		syncWork:  make(chan func() (context.Context, chan struct{}, Poolable)),
+		workers: workers,
+		work:    make(chan func() (context.Context, chan error, Poolable)),
 	}
 
 	for _, opt := range opts {
@@ -67,9 +65,7 @@ func NewPoolManager(opts ...managerOpt) PoolManager {
 type manager struct {
 	workersMu sync.RWMutex
 	workers   []*poolWorker
-	async     bool
-	asyncWork chan func() (context.Context, Poolable)
-	syncWork  chan func() (context.Context, chan struct{}, Poolable)
+	work      chan func() (context.Context, chan error, Poolable)
 }
 
 // Start implements the PoolManager interface.
@@ -77,7 +73,7 @@ func (m *manager) Start() error {
 	m.workersMu.RLock()
 	defer m.workersMu.RUnlock()
 	for _, worker := range m.workers {
-		go worker.run(m.syncWork, m.asyncWork)
+		go worker.run(m.work)
 	}
 	return nil
 }
@@ -94,18 +90,12 @@ func (m *manager) Stop() error {
 
 // Pool is used to pool a Poolable function.
 func (m *manager) Pool(p Poolable) Poolable {
-	return func(ctx context.Context) {
-		if m.async {
-			m.asyncWork <- func() (context.Context, Poolable) {
-				return ctx, p
-			}
-			return
+	return func(ctx context.Context) error {
+		err := errPool.Get().(chan error)
+		m.work <- func() (context.Context, chan error, Poolable) {
+			return ctx, err, p
 		}
-		sig := make(chan struct{})
-		m.syncWork <- func() (context.Context, chan struct{}, Poolable) {
-			return ctx, sig, p
-		}
-		<-sig
+		return <-err
 	}
 }
 
@@ -117,8 +107,7 @@ type poolWorker struct {
 }
 
 func (w *poolWorker) run(
-	syncWork <-chan func() (context.Context, chan struct{}, Poolable),
-	asyncWork <-chan func() (context.Context, Poolable),
+	work <-chan func() (context.Context, chan error, Poolable),
 ) error {
 	runtime.LockOSThread()
 	threadID := unix.Gettid()
@@ -134,17 +123,12 @@ func (w *poolWorker) run(
 	spanName := fmt.Sprintf("pool-%d", threadID)
 	for {
 		select {
-		case item := <-asyncWork:
-			ctx, fn := item()
+		case item := <-work:
+			ctx, err, fn := item()
 			ctx, span := w.tracer.Start(ctx, spanName, apitrace.WithRecordEvents())
-			profiler.Profile(ctx, span, fn)
+			err <- profiler.Profile(ctx, span, fn)
 			span.End()
-		case item := <-syncWork:
-			ctx, sig, fn := item()
-			ctx, span := w.tracer.Start(ctx, spanName, apitrace.WithRecordEvents())
-			profiler.Profile(ctx, span, fn)
-			close(sig)
-			span.End()
+			errPool.Put(err)
 		case <-w.stopChan:
 			// TODO(hodgesds): Unset thread affinity?
 			runtime.UnlockOSThread()
