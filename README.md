@@ -11,13 +11,17 @@ See the [perf-utils](https://github.com/hodgesds/perf-utils#setup) setup
 instructions for system configuration.
 
 ## Pooling functions
-This library handles functions that are `Poolable` and does a few special
-things. When a function is pooled by a PoolManager it returns a `Poolable`
-function that when called will execute on a worker goroutine. The worker
-goroutines are locked to an OS thread and bound to a CPU. This allows for the
+This library handles functions that are
+[`Poolable`](https://godoc.org/github.com/hodgesds/opentelemetry-perf#Poolable)
+and does a few special things. When a function is pooled by a
+[`PoolManager`](https://godoc.org/github.com/hodgesds/opentelemetry-perf#PoolManager)
+it returns a `Poolable` function that when called will execute on a worker
+goroutine. The worker goroutines are locked to an OS thread and bound to a CPU.
+This allows for
 [`perf_event_open`](http://www.man7.org/linux/man-pages/man2/perf_event_open.2.html)
-to be used to profile the thread that the goroutine is executing on and
-annotate traces using the perf subsystem. Spans can also be annotate with
+to be used to profile the thread that the goroutine is executing on. After the
+`Poolable` function returns a profile is captured and the span is annotated.
+Spans can also be annotate with
 [kprobes](https://www.kernel.org/doc/html/latest/trace/kprobetrace.html) or
 potentially eBPF programs. The `Poolable` type is as follows:
 
