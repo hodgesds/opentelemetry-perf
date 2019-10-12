@@ -8,7 +8,6 @@ import (
 
 	otperf "github.com/hodgesds/opentelemetry-perf"
 	perf "github.com/hodgesds/perf-utils"
-	"go.opentelemetry.io/api/core"
 	"go.opentelemetry.io/exporter/trace/stdout"
 	"go.opentelemetry.io/sdk/trace"
 	sdktrace "go.opentelemetry.io/sdk/trace"
