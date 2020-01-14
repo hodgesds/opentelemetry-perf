@@ -6,6 +6,15 @@ This is a Go package that allows for the use of the Linux perf subsystem with
 OpenTelemetry [spans](https://godoc.org/go.opentelemetry.io/api/trace#Span)
 with data collected from the perf subsystem.
 
+## Use Cases
+Annoting spans with perf based events can provide far more insight to the observed 
+performance across systems. The following examples are a subset of the potential use
+cases.
+
+- How many CPU cycles were spent across a set of distributed services?
+- Across a set of RPC requests how many block IO requests were made?
+- How many block IO requests were made across a set of service calls?
+
 ## System Configuration
 See the [perf-utils](https://github.com/hodgesds/perf-utils#setup) setup
 instructions for system configuration.
