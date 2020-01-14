@@ -13,7 +13,7 @@ cases.
 
 - How many CPU cycles were spent across a set of distributed services?
 - Across a set of RPC requests how many block IO requests were made?
-- How many block IO requests were made across a set of service calls?
+- How many L1I cache hits were made across a set of service calls?
 
 ## System Configuration
 See the [perf-utils](https://github.com/hodgesds/perf-utils#setup) setup
